@@ -1,5 +1,17 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import type { SystemConfig, Ticket, User, Category, KnowledgeArticle, DashboardStats, Department } from '../types';
+import type { 
+  SystemConfig, 
+  Ticket, 
+  User, 
+  Category, 
+  KnowledgeArticle, 
+  DashboardStats, 
+  Department,
+  EmailAccount,
+  ImportedEmail,
+  EmailProcessingRule,
+  EmailSyncStatus
+} from '../types';
 
 interface SystemContextType {
   config: SystemConfig;
@@ -9,6 +21,10 @@ interface SystemContextType {
   categories: Category[];
   knowledgeArticles: KnowledgeArticle[];
   departments: Department[];
+  emailAccounts: EmailAccount[];
+  importedEmails: ImportedEmail[];
+  emailProcessingRules: EmailProcessingRule[];
+  emailSyncStatus: EmailSyncStatus[];
   dashboardStats: DashboardStats;
   createTicket: (ticket: Omit<Ticket, 'id' | 'createdAt' | 'updatedAt'>) => void;
   updateTicket: (id: string, updates: Partial<Ticket>) => void;
@@ -21,6 +37,15 @@ interface SystemContextType {
   createDepartment: (department: Omit<Department, 'id' | 'createdAt'>) => void;
   updateDepartment: (id: string, updates: Partial<Department>) => void;
   deleteDepartment: (id: string) => void;
+  createEmailAccount: (account: Omit<EmailAccount, 'id' | 'createdAt'>) => void;
+  updateEmailAccount: (id: string, updates: Partial<EmailAccount>) => void;
+  deleteEmailAccount: (id: string) => void;
+  testEmailConnection: (accountId: string) => Promise<boolean>;
+  syncEmailAccount: (accountId: string) => Promise<void>;
+  processEmail: (emailId: string) => Promise<void>;
+  createEmailProcessingRule: (rule: Omit<EmailProcessingRule, 'id' | 'createdAt'>) => void;
+  updateEmailProcessingRule: (id: string, updates: Partial<EmailProcessingRule>) => void;
+  deleteEmailProcessingRule: (id: string) => void;
   assignTicketToAvailableTechnician: (ticketId: string) => boolean;
   getUnassignedTickets: () => Ticket[];
 }
@@ -139,6 +164,11 @@ const mockKnowledgeArticles: KnowledgeArticle[] = [];
 
 const mockDepartments: Department[] = [];
 
+const mockEmailAccounts: EmailAccount[] = [];
+const mockImportedEmails: ImportedEmail[] = [];
+const mockEmailProcessingRules: EmailProcessingRule[] = [];
+const mockEmailSyncStatus: EmailSyncStatus[] = [];
+
 export function SystemProvider({ children }: { children: React.ReactNode }) {
   const [config, setConfig] = useState<SystemConfig>(defaultConfig);
   const [tickets, setTickets] = useState<Ticket[]>(mockTickets);
@@ -146,6 +176,10 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
   const [categories, setCategories] = useState<Category[]>(mockCategories);
   const [knowledgeArticles, setKnowledgeArticles] = useState<KnowledgeArticle[]>(mockKnowledgeArticles);
   const [departments, setDepartments] = useState<Department[]>(mockDepartments);
+  const [emailAccounts, setEmailAccounts] = useState<EmailAccount[]>(mockEmailAccounts);
+  const [importedEmails, setImportedEmails] = useState<ImportedEmail[]>(mockImportedEmails);
+  const [emailProcessingRules, setEmailProcessingRules] = useState<EmailProcessingRule[]>(mockEmailProcessingRules);
+  const [emailSyncStatus, setEmailSyncStatus] = useState<EmailSyncStatus[]>(mockEmailSyncStatus);
 
   useEffect(() => {
     // Cargar configuración guardada
@@ -173,6 +207,21 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
     const savedDepartments = localStorage.getItem('departments');
     if (savedDepartments) {
       setDepartments(JSON.parse(savedDepartments));
+    }
+
+    const savedEmailAccounts = localStorage.getItem('emailAccounts');
+    if (savedEmailAccounts) {
+      setEmailAccounts(JSON.parse(savedEmailAccounts));
+    }
+
+    const savedImportedEmails = localStorage.getItem('importedEmails');
+    if (savedImportedEmails) {
+      setImportedEmails(JSON.parse(savedImportedEmails));
+    }
+
+    const savedEmailProcessingRules = localStorage.getItem('emailProcessingRules');
+    if (savedEmailProcessingRules) {
+      setEmailProcessingRules(JSON.parse(savedEmailProcessingRules));
     }
   }, []);
 
@@ -339,6 +388,10 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
       categories,
       knowledgeArticles,
       departments,
+      emailAccounts,
+      importedEmails,
+      emailProcessingRules,
+      emailSyncStatus,
       dashboardStats,
       createTicket,
       updateTicket,
@@ -351,6 +404,15 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
       createDepartment,
       updateDepartment,
       deleteDepartment,
+      createEmailAccount,
+      updateEmailAccount,
+      deleteEmailAccount,
+      testEmailConnection,
+      syncEmailAccount,
+      processEmail,
+      createEmailProcessingRule,
+      updateEmailProcessingRule,
+      deleteEmailProcessingRule,
       assignTicketToAvailableTechnician,
       getUnassignedTickets
     }}>

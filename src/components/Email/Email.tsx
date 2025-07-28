@@ -1,10 +1,24 @@
 import React, { useState } from 'react';
-import { Mail, Send, Inbox, Settings, Users, AlertCircle, CheckCircle } from 'lucide-react';
+import { Mail, Send, Inbox, Settings, Users, AlertCircle, CheckCircle, Plus, Download, Sync, Play, Pause } from 'lucide-react';
 import { useSystem } from '../../contexts/SystemContext';
+import { EmailAccountModal } from './EmailAccountModal';
+import { EmailProcessingRulesModal } from './EmailProcessingRulesModal';
 
 export function Email() {
-  const { config, updateConfig } = useSystem();
-  const [activeTab, setActiveTab] = useState('overview');
+  const { 
+    config, 
+    updateConfig, 
+    emailAccounts, 
+    importedEmails, 
+    emailSyncStatus,
+    testEmailConnection,
+    syncEmailAccount,
+    processEmail
+  } = useSystem();
+  const [activeTab, setActiveTab] = useState('accounts');
+  const [showAccountModal, setShowAccountModal] = useState(false);
+  const [showRulesModal, setShowRulesModal] = useState(false);
+  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
   const [emailSettings, setEmailSettings] = useState({
     smtpServer: config.notifications.smtpServer,
     smtpPort: config.notifications.smtpPort,
@@ -14,11 +28,29 @@ export function Email() {
   });
 
   const tabs = [
-    { id: 'overview', label: 'Resumen', icon: Mail },
+    { id: 'accounts', label: 'Cuentas de Email', icon: Mail },
+    { id: 'imported', label: 'Emails Importados', icon: Inbox },
+    { id: 'rules', label: 'Reglas de Procesamiento', icon: Settings },
+    { id: 'overview', label: 'Resumen', icon: Users },
     { id: 'settings', label: 'Configuración SMTP', icon: Settings },
-    { id: 'templates', label: 'Plantillas', icon: Inbox },
-    { id: 'logs', label: 'Historial', icon: Users }
+    { id: 'templates', label: 'Plantillas', icon: Mail },
+    { id: 'logs', label: 'Historial', icon: AlertCircle }
   ];
+
+  const handleTestConnection = async (accountId: string) => {
+    const success = await testEmailConnection(accountId);
+    alert(success ? 'Conexión exitosa' : 'Error en la conexión');
+  };
+
+  const handleSyncAccount = async (accountId: string) => {
+    await syncEmailAccount(accountId);
+    alert('Sincronización completada');
+  };
+
+  const handleProcessEmail = async (emailId: string) => {
+    await processEmail(emailId);
+    alert('Email procesado correctamente');
+  };
 
   const handleSaveSettings = () => {
     updateConfig({
@@ -78,6 +110,242 @@ export function Email() {
           })}
         </nav>
       </div>
+
+      {/* Email Accounts Tab */}
+      {activeTab === 'accounts' && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-gray-900">Cuentas de Correo Electrónico</h3>
+            <button 
+              onClick={() => setShowAccountModal(true)}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+            >
+              <Plus size={16} />
+              <span>Nueva Cuenta</span>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {emailAccounts.map((account) => {
+              const syncStatus = emailSyncStatus.find(s => s.accountId === account.id);
+              return (
+                <div key={account.id} className="bg-white p-6 rounded-lg shadow-sm border">
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <h4 className="text-lg font-semibold text-gray-900">{account.name}</h4>
+                      <p className="text-sm text-gray-600">{account.email}</p>
+                      <p className="text-xs text-gray-500">{account.provider.toUpperCase()} - {account.server}:{account.port}</p>
+                    </div>
+                    <div className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      account.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                    }`}>
+                      {account.isActive ? 'Activa' : 'Inactiva'}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 mb-4">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-600">Última sincronización:</span>
+                      <span className="font-medium">
+                        {account.lastSync 
+                          ? new Date(account.lastSync).toLocaleString('es-ES')
+                          : 'Nunca'
+                        }
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-600">Intervalo de sincronización:</span>
+                      <span className="font-medium">{account.syncInterval} min</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-600">Crear tickets automáticamente:</span>
+                      <span className={`font-medium ${account.autoCreateTickets ? 'text-green-600' : 'text-gray-600'}`}>
+                        {account.autoCreateTickets ? 'Sí' : 'No'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {syncStatus && (
+                    <div className="mb-4 p-3 bg-blue-50 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-blue-900">
+                          {syncStatus.isRunning ? 'Sincronizando...' : 'Última sincronización'}
+                        </span>
+                        {syncStatus.isRunning && (
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                        )}
+                      </div>
+                      <div className="text-xs text-blue-700 mt-1">
+                        {syncStatus.totalEmails} emails encontrados, {syncStatus.processedEmails} procesados
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => handleTestConnection(account.id)}
+                      className="flex-1 bg-gray-100 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-200 transition-colors text-sm"
+                    >
+                      Probar Conexión
+                    </button>
+                    <button
+                      onClick={() => handleSyncAccount(account.id)}
+                      disabled={syncStatus?.isRunning}
+                      className="flex-1 bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm disabled:opacity-50 flex items-center justify-center space-x-1"
+                    >
+                      <Sync size={14} />
+                      <span>Sincronizar</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {emailAccounts.length === 0 && (
+            <div className="text-center py-12">
+              <Mail className="mx-auto h-12 w-12 text-gray-400" />
+              <h3 className="mt-2 text-sm font-medium text-gray-900">No hay cuentas configuradas</h3>
+              <p className="mt-1 text-sm text-gray-500">
+                Agrega una cuenta de correo para comenzar a importar emails automáticamente.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Imported Emails Tab */}
+      {activeTab === 'imported' && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-gray-900">Emails Importados</h3>
+            <div className="flex items-center space-x-2">
+              <span className="text-sm text-gray-600">
+                Total: {importedEmails.length} | Procesados: {importedEmails.filter(e => e.processed).length}
+              </span>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Email
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Estado
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Ticket
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Recibido
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Acciones
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {importedEmails.map((email) => (
+                    <tr key={email.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4">
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">
+                            {email.subject}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            De: {email.from}
+                          </div>
+                          {email.attachments.length > 0 && (
+                            <div className="text-xs text-blue-600 mt-1">
+                              📎 {email.attachments.length} adjunto(s)
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                          email.processed 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-yellow-100 text-yellow-800'
+                        }`}>
+                          {email.processed ? 'Procesado' : 'Pendiente'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-900">
+                        {email.ticketId ? (
+                          <span className="text-blue-600">#{email.ticketId}</span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-500">
+                        {new Date(email.receivedAt).toLocaleString('es-ES')}
+                      </td>
+                      <td className="px-6 py-4 text-right text-sm font-medium">
+                        {!email.processed && (
+                          <button
+                            onClick={() => handleProcessEmail(email.id)}
+                            className="text-blue-600 hover:text-blue-900 flex items-center space-x-1"
+                          >
+                            <Play size={14} />
+                            <span>Procesar</span>
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {importedEmails.length === 0 && (
+              <div className="text-center py-12">
+                <Inbox className="mx-auto h-12 w-12 text-gray-400" />
+                <h3 className="mt-2 text-sm font-medium text-gray-900">No hay emails importados</h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  Los emails aparecerán aquí cuando se sincronicen las cuentas configuradas.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Processing Rules Tab */}
+      {activeTab === 'rules' && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-gray-900">Reglas de Procesamiento</h3>
+            <button 
+              onClick={() => setShowRulesModal(true)}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+            >
+              <Plus size={16} />
+              <span>Nueva Regla</span>
+            </button>
+          </div>
+
+          <div className="bg-white p-6 rounded-lg shadow-sm border">
+            <p className="text-gray-600 mb-4">
+              Las reglas de procesamiento permiten automatizar la creación y categorización de tickets basándose en el contenido de los emails.
+            </p>
+            
+            <div className="space-y-4">
+              <div className="border border-gray-200 rounded-lg p-4">
+                <h4 className="font-medium text-gray-900 mb-2">Regla de Ejemplo</h4>
+                <div className="text-sm text-gray-600 space-y-1">
+                  <p><strong>Condición:</strong> Asunto contiene "impresora"</p>
+                  <p><strong>Acción:</strong> Crear ticket con prioridad "Alta" y categoría "Hardware"</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Overview Tab */}
       {activeTab === 'overview' && (
@@ -371,6 +639,16 @@ export function Email() {
           </div>
         </div>
       )}
+
+      <EmailAccountModal 
+        isOpen={showAccountModal}
+        onClose={() => setShowAccountModal(false)}
+      />
+      
+      <EmailProcessingRulesModal 
+        isOpen={showRulesModal}
+        onClose={() => setShowRulesModal(false)}
+      />
     </div>
   );
 }

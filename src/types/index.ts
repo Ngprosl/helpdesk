@@ -87,6 +87,93 @@ export interface Attachment {
   url: string;
 }
 
+// Represents an email account configuration
+export interface EmailAccount {
+  id: string;
+  name: string;
+  email: string;
+  provider: 'imap' | 'pop3' | 'exchange';
+  server: string;
+  port: number;
+  username: string;
+  password: string;
+  useSSL: boolean;
+  isActive: boolean;
+  lastSync?: string;
+  syncInterval: number; // minutes
+  autoCreateTickets: boolean;
+  defaultPriority: 'low' | 'medium' | 'high' | 'critical';
+  defaultCategory: string;
+  createdAt: string;
+}
+
+// Represents an imported email
+export interface ImportedEmail {
+  id: string;
+  messageId: string;
+  accountId: string;
+  from: string;
+  to: string[];
+  cc?: string[];
+  subject: string;
+  body: string;
+  bodyHtml?: string;
+  receivedAt: string;
+  importedAt: string;
+  processed: boolean;
+  ticketId?: string;
+  attachments: EmailAttachment[];
+  headers: Record<string, string>;
+  isReply: boolean;
+  inReplyTo?: string;
+  references?: string[];
+}
+
+// Represents an email attachment
+export interface EmailAttachment {
+  id: string;
+  filename: string;
+  contentType: string;
+  size: number;
+  content: string; // base64 encoded
+}
+
+// Represents email processing rules
+export interface EmailProcessingRule {
+  id: string;
+  name: string;
+  isActive: boolean;
+  conditions: EmailCondition[];
+  actions: EmailAction[];
+  priority: number;
+  createdAt: string;
+}
+
+// Represents an email condition
+export interface EmailCondition {
+  field: 'from' | 'to' | 'subject' | 'body' | 'attachment';
+  operator: 'contains' | 'equals' | 'starts_with' | 'ends_with' | 'regex';
+  value: string;
+  caseSensitive: boolean;
+}
+
+// Represents an email action
+export interface EmailAction {
+  type: 'create_ticket' | 'assign_category' | 'set_priority' | 'assign_technician' | 'add_tag' | 'ignore';
+  value: string;
+}
+
+// Represents email sync status
+export interface EmailSyncStatus {
+  accountId: string;
+  isRunning: boolean;
+  lastSync?: string;
+  nextSync?: string;
+  totalEmails: number;
+  processedEmails: number;
+  errors: string[];
+}
+
 // Represents a ticket category
 export interface Category {
   id: string;
