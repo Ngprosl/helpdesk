@@ -366,6 +366,131 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
     );
   };
 
+  const createEmailAccount = (accountData: Omit<EmailAccount, 'id' | 'createdAt'>) => {
+    const newAccount: EmailAccount = {
+      ...accountData,
+      id: Date.now().toString(),
+      createdAt: new Date().toISOString()
+    };
+    const updatedAccounts = [newAccount, ...emailAccounts];
+    setEmailAccounts(updatedAccounts);
+    localStorage.setItem('emailAccounts', JSON.stringify(updatedAccounts));
+  };
+
+  const updateEmailAccount = (id: string, updates: Partial<EmailAccount>) => {
+    const updatedAccounts = emailAccounts.map(account => 
+      account.id === id ? { ...account, ...updates } : account
+    );
+    setEmailAccounts(updatedAccounts);
+    localStorage.setItem('emailAccounts', JSON.stringify(updatedAccounts));
+  };
+
+  const deleteEmailAccount = (id: string) => {
+    const updatedAccounts = emailAccounts.filter(account => account.id !== id);
+    setEmailAccounts(updatedAccounts);
+    localStorage.setItem('emailAccounts', JSON.stringify(updatedAccounts));
+  };
+
+  const testEmailConnection = async (accountId: string): Promise<boolean> => {
+    const account = emailAccounts.find(acc => acc.id === accountId);
+    if (!account) return false;
+
+    // Simular test de conexión
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        resolve(Math.random() > 0.2); // 80% de éxito
+      }, 2000);
+    });
+  };
+
+  const syncEmailAccount = async (accountId: string): Promise<void> => {
+    const account = emailAccounts.find(acc => acc.id === accountId);
+    if (!account) return;
+
+    // Actualizar estado de sincronización
+    const syncStatus: EmailSyncStatus = {
+      accountId,
+      status: 'syncing',
+      lastSync: new Date().toISOString(),
+      emailsImported: 0,
+      errors: []
+    };
+    
+    const updatedSyncStatus = emailSyncStatus.filter(s => s.accountId !== accountId);
+    updatedSyncStatus.push(syncStatus);
+    setEmailSyncStatus(updatedSyncStatus);
+
+    // Simular importación de emails
+    setTimeout(() => {
+      const mockEmails: ImportedEmail[] = Array.from({ length: 5 }, (_, i) => ({
+        id: `${Date.now()}-${i}`,
+        accountId,
+        messageId: `msg-${Date.now()}-${i}`,
+        subject: `Email de prueba ${i + 1}`,
+        from: `usuario${i + 1}@example.com`,
+        to: [account.email],
+        body: `Contenido del email ${i + 1}`,
+        receivedAt: new Date(Date.now() - i * 3600000).toISOString(),
+        processed: false,
+        ticketCreated: false,
+        attachments: [],
+        headers: {},
+        isReply: false
+      }));
+
+      const updatedEmails = [...mockEmails, ...importedEmails];
+      setImportedEmails(updatedEmails);
+      localStorage.setItem('importedEmails', JSON.stringify(updatedEmails));
+
+      // Actualizar estado final
+      const finalSyncStatus = {
+        ...syncStatus,
+        status: 'completed' as const,
+        emailsImported: mockEmails.length
+      };
+      const finalUpdatedSyncStatus = emailSyncStatus.filter(s => s.accountId !== accountId);
+      finalUpdatedSyncStatus.push(finalSyncStatus);
+      setEmailSyncStatus(finalUpdatedSyncStatus);
+    }, 3000);
+  };
+
+  const processEmail = async (emailId: string): Promise<void> => {
+    const email = importedEmails.find(e => e.id === emailId);
+    if (!email || email.processed) return;
+
+    // Marcar como procesado
+    const updatedEmails = importedEmails.map(e => 
+      e.id === emailId ? { ...e, processed: true } : e
+    );
+    setImportedEmails(updatedEmails);
+    localStorage.setItem('importedEmails', JSON.stringify(updatedEmails));
+  };
+
+  const createEmailProcessingRule = (ruleData: Omit<EmailProcessingRule, 'id' | 'createdAt'>) => {
+    const newRule: EmailProcessingRule = {
+      ...ruleData,
+      id: Date.now().toString(),
+      createdAt: new Date().toISOString()
+    };
+    const updatedRules = [newRule, ...emailProcessingRules];
+    setEmailProcessingRules(updatedRules);
+    localStorage.setItem('emailProcessingRules', JSON.stringify(updatedRules));
+  };
+
+  const updateEmailProcessingRule = (id: string, updates: Partial<EmailProcessingRule>) => {
+    const updatedRules = emailProcessingRules.map(rule => 
+      rule.id === id ? { ...rule, ...updates } : rule
+    );
+    setEmailProcessingRules(updatedRules);
+    localStorage.setItem('emailProcessingRules', JSON.stringify(updatedRules));
+  };
+
+  const deleteEmailProcessingRule = (id: string) => {
+    const updatedRules = emailProcessingRules.filter(rule => rule.id !== id);
+    setEmailProcessingRules(updatedRules);
+    localStorage.setItem('emailProcessingRules', JSON.stringify(updatedRules));
+  };
+
   // Calcular estadísticas del dashboard
   const dashboardStats: DashboardStats = {
     totalTickets: 0,
