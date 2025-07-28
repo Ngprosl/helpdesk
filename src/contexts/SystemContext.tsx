@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { emailService, processEmailsSecurely } from '../services/EmailService';
 import type { 
   SystemConfig, 
   Ticket, 
@@ -395,63 +396,96 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
     const account = emailAccounts.find(acc => acc.id === accountId);
     if (!account) return false;
 
-    // Simular test de conexión
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve(Math.random() > 0.2); // 80% de éxito
-      }, 2000);
-    });
+    try {
+      console.log(`🧪 Probando conexión para cuenta: ${account.name}`);
+      
+      // Usar el servicio real para probar conexión
+      const testResult = await emailService.connect(account);
+      
+      if (testResult) {
+        console.log('✅ Test de conexión exitoso');
+        await emailService.disconnect();
+        return true;
+      } else {
+        console.log('❌ Test de conexión fallido');
+        return false;
+      }
+      
+    } catch (error) {
+      console.error('❌ Error en test de conexión:', error);
+      return false;
+    }
   };
 
   const syncEmailAccount = async (accountId: string): Promise<void> => {
     const account = emailAccounts.find(acc => acc.id === accountId);
     if (!account) return;
 
-    // Actualizar estado de sincronización
-    const syncStatus: EmailSyncStatus = {
-      accountId,
-      status: 'syncing',
-      lastSync: new Date().toISOString(),
-      emailsImported: 0,
-      errors: []
-    };
-    
-    const updatedSyncStatus = emailSyncStatus.filter(s => s.accountId !== accountId);
-    updatedSyncStatus.push(syncStatus);
-    setEmailSyncStatus(updatedSyncStatus);
-
-    // Simular importación de emails
-    setTimeout(() => {
-      const mockEmails: ImportedEmail[] = Array.from({ length: 5 }, (_, i) => ({
-        id: `${Date.now()}-${i}`,
+    try {
+      // Actualizar estado de sincronización
+      const syncStatus: EmailSyncStatus = {
         accountId,
-        messageId: `msg-${Date.now()}-${i}`,
-        subject: `Email de prueba ${i + 1}`,
-        from: `usuario${i + 1}@example.com`,
-        to: [account.email],
-        body: `Contenido del email ${i + 1}`,
-        receivedAt: new Date(Date.now() - i * 3600000).toISOString(),
-        processed: false,
-        ticketCreated: false,
-        attachments: [],
-        headers: {},
-        isReply: false
-      }));
+        isRunning: true,
+        lastSync: new Date().toISOString(),
+        totalEmails: 0,
+        processedEmails: 0,
+        errors: []
+      };
+      
+      const updatedSyncStatus = emailSyncStatus.filter(s => s.accountId !== accountId);
+      updatedSyncStatus.push(syncStatus);
+      setEmailSyncStatus(updatedSyncStatus);
 
-      const updatedEmails = [...mockEmails, ...importedEmails];
+      // Usar el servicio real de email
+      const processedEmails = await processEmailsSecurely(account, (progress) => {
+        console.log(`📊 Progreso: ${progress.current}/${progress.total} - ${progress.message}`);
+        
+        // Actualizar estado de progreso
+        const progressSyncStatus = {
+          ...syncStatus,
+          totalEmails: progress.total,
+          processedEmails: progress.current
+        };
+        const progressUpdatedSyncStatus = emailSyncStatus.filter(s => s.accountId !== accountId);
+        progressUpdatedSyncStatus.push(progressSyncStatus);
+        setEmailSyncStatus(progressUpdatedSyncStatus);
+      });
+
+      // Agregar emails importados
+      const updatedEmails = [...processedEmails, ...importedEmails];
       setImportedEmails(updatedEmails);
       localStorage.setItem('importedEmails', JSON.stringify(updatedEmails));
 
-      // Actualizar estado final
+      // Actualizar estado final exitoso
       const finalSyncStatus = {
         ...syncStatus,
-        status: 'completed' as const,
-        emailsImported: mockEmails.length
+        isRunning: false,
+        totalEmails: processedEmails.length,
+        processedEmails: processedEmails.length,
+        nextSync: new Date(Date.now() + account.syncInterval * 60000).toISOString()
       };
       const finalUpdatedSyncStatus = emailSyncStatus.filter(s => s.accountId !== accountId);
       finalUpdatedSyncStatus.push(finalSyncStatus);
       setEmailSyncStatus(finalUpdatedSyncStatus);
-    }, 3000);
+
+      console.log(`✅ Sincronización completada: ${processedEmails.length} emails procesados`);
+      
+    } catch (error) {
+      console.error('❌ Error en sincronización:', error);
+      
+      // Actualizar estado con error
+      const errorSyncStatus: EmailSyncStatus = {
+        accountId,
+        isRunning: false,
+        lastSync: new Date().toISOString(),
+        totalEmails: 0,
+        processedEmails: 0,
+        errors: [error instanceof Error ? error.message : 'Error desconocido']
+      };
+      const errorUpdatedSyncStatus = emailSyncStatus.filter(s => s.accountId !== accountId);
+      errorUpdatedSyncStatus.push(errorSyncStatus);
+      setEmailSyncStatus(errorUpdatedSyncStatus);
+    }
   };
 
   const processEmail = async (emailId: string): Promise<void> => {
